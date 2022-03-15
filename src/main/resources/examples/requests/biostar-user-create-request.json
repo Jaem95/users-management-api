@@ -1,0 +1,12 @@
+{
+  "User": {
+    "name": "UserTest",
+    "user_id": "2932222",
+    "user_group_id": {
+      "id": "1"
+    },
+    "disabled": "false",
+    "start_datetime": "2001-01-01T00:00:00.00Z",
+    "expiry_datetime": "2030-12-31T23:59:00.00Z"
+  }
+}

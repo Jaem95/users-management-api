@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tls="http://www.mulesoft.org/schema/mule/tls" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd">
+	<http:request-config name="HTTP_Biostar_Request_Configuration" doc:name="HTTP Request configuration" doc:id="4650e82e-f599-43a3-a782-0debe2b6967e" >
+		<http:request-connection protocol="HTTPS" host="20.203.15.128" port="443" >
+			<tls:context >
+				<tls:trust-store insecure="true" />
+			</tls:context>
+		</http:request-connection>
+	</http:request-config>
+	<flow name="post:\v1\users:application\json:users-api-config">
+		<ee:transform doc:name="Transform Message" doc:id="85226cbf-007c-48eb-8acf-3f09a69875ec" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="biostarData" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	User: {
+		name: payload[0].FullName,
+		user_id: payload[0].Id as String,
+		user_group_id: {
+			id: "1"
+		},
+		disabled: payload[0].CreateUser as String,
+		start_datetime: "2001-01-01T00:00:00.00Z",
+		expiry_datetime: "2030-12-31T23:59:00.00Z"
+	}
+}]]></ee:set-variable>
+				<ee:set-variable variableName="smartlaunchData" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	UserCreate: {
+		UserName: payload[0].Email,
+		UsergroupName: "Members"
+	}
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="240b4aa1-1c73-4f42-860d-49483ce16f4f" message="#[vars.biostarData]"/>
+		<logger level="INFO" doc:name="Logger" doc:id="95f78906-f0bd-4f1a-b4a1-bd00258ca471" message="#[vars.smartlaunchData]"/>
+		<http:request method="POST" doc:name="Biostar Request Login" doc:id="5dacf2f7-dd21-485c-afcf-cc4c38d69b6b" config-ref="HTTP_Biostar_Request_Configuration" path="/api/login">
+			<http:body ><![CDATA[#[output application/json
+---
+{
+  "User": {
+    "login_id": "admin",
+    "password": "bs24dm1n"
+  }
+}]]]></http:body>
+		</http:request>
+		<ee:transform doc:name="Handle Biostar Session" doc:id="19f551b3-fac2-4cb3-b1b2-1f60378b4545" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="biostarSession" ><![CDATA[%dw 2.0
+output application/java
+---
+attributes.headers."bs-session-id"]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<scatter-gather doc:name="Scatter-Gather" doc:id="e5658205-3f27-4051-84ae-c91e057ccf04" >
+			<route >
+				<http:request method="POST" doc:name="Biostar Request" doc:id="2ce77be4-873a-43e4-8ce6-ff0d78b0498a" config-ref="HTTP_Biostar_Request_Configuration" path="/api/users">
+					<http:body ><![CDATA[#[vars.biostarData]]]></http:body>
+					<http:headers ><![CDATA[#["bs-session-id":vars.biostarSession]]]></http:headers>
+				</http:request>
+			</route>
+			<route >
+				<http:request method="POST" doc:name="SmartLauch Request" doc:id="2c7cb2e8-69e2-4f3e-a002-9f467f37f1b1" url="http://20.223.161.66:7833/users">
+					<http:body ><![CDATA[#[vars.smartlaunchData]]]></http:body>
+				</http:request>
+			</route>
+		</scatter-gather>
+		<ee:transform doc:name="Handle Response" doc:id="7c48f802-9d04-4eb1-b1d5-521d9db1e5af" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+    
+</flow>
+</mule>
